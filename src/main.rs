@@ -1,9 +1,10 @@
-#[cfg(target_pointer_width = "64")]
+#![cfg(target_pointer_width = "64")]
 
-use std::fmt::Error;
 use std::{collections::HashMap, ops::Add};
+use strum::IntoEnumIterator;
+use strum_macros::EnumIter;
+use log::debug;
 
-use crate::WordDirection::Right;
 
 #[derive(Debug, Clone)]
 enum CrosswordError {
@@ -12,18 +13,18 @@ enum CrosswordError {
 }
 struct CrosswordDimensions { pub width: usize, pub height: usize }
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-struct CrosswordPosition { pub x: usize, pub y: usize }
+struct CrosswordPosition { pub x: isize, pub y: isize }
 impl CrosswordPosition {
-    fn get_position_from_direction(self, direction: WordDirection, amount: usize) -> Self {
+    fn get_position_from_direction(self, direction: &WordDirection, amount: usize) -> Self {
         match direction {
-            WordDirection::Up => todo!(),
-            WordDirection::UpRight => todo!(),
-            WordDirection::Right => CrosswordPosition { x: self.x + (amount), y: self.y },
-            WordDirection::DownRight => todo!(),
-            WordDirection::Down => todo!(),
-            WordDirection::DownLeft => todo!(),
-            WordDirection::Left => todo!(),
-            WordDirection::UpLeft => todo!(),
+            WordDirection::Up => CrosswordPosition { x: self.x, y: self.y + amount as isize },
+            WordDirection::UpRight => CrosswordPosition { x: self.x + amount as isize, y: self.y + amount as isize },
+            WordDirection::Right => CrosswordPosition { x: self.x + amount as isize, y: self.y },
+            WordDirection::DownRight => CrosswordPosition { x: self.x + amount as isize, y: self.y - amount as isize },
+            WordDirection::Down => CrosswordPosition { x: self.x, y: self.y - amount as isize },
+            WordDirection::DownLeft => CrosswordPosition { x: self.x - amount as isize, y: self.y - amount as isize },
+            WordDirection::Left => CrosswordPosition { x: self.x - amount as isize, y: self.y },
+            WordDirection::UpLeft => CrosswordPosition { x: self.x - amount as isize, y: self.y + amount as isize },
         }
 
     }
@@ -38,7 +39,7 @@ impl Add for CrosswordPosition {
         }
     }
 }
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, EnumIter)]
 enum WordDirection {
     Up,
     UpRight,
@@ -58,7 +59,7 @@ struct CrosswordWordData {
 
 #[derive(Debug, PartialEq, Eq)]
 struct CrosswordPuzzleSolver {
-    crossword: Vec<Vec<char>>,
+    pub crossword: Vec<Vec<char>>,
     letter_index: HashMap<char, Vec<CrosswordPosition>>
 }
 
@@ -70,27 +71,28 @@ impl CrosswordPuzzleSolver {
         
         let mut letter_index: HashMap<char, Vec<CrosswordPosition>> = HashMap::new();
 
-        let mut x = 0;
-        for char in crossword.chars() {
+        for (x, char) in crossword.chars().collect::<Vec<char>>().chunks(dimensions.width).rev().flatten().enumerate() {
             let position = CrosswordPosition {
-                x: x % dimensions.width as usize,
-                y: x / dimensions.width as usize
+                x: x as isize % dimensions.width as isize,
+                y: x as isize / dimensions.width as isize
             };
+            //dbg!(position);
+            //dbg!(char);
 
             if let Some(positions) = letter_index.get_mut(&char) {
                 positions.push(position);
             } else {
-                letter_index.insert(char.clone(), vec![position]);
+                letter_index.insert(*char, vec![position]);
             }
-            x += 1;
         }
 
-        return Ok(Self {
+        Ok(Self {
             crossword: crossword
                 .chars()
                 .collect::<Vec<char>>()
-                .chunks(dimensions.width as usize)
+                .chunks(dimensions.width)
                 .map(|x| x.to_vec())
+                .rev()
                 .collect::<Vec<Vec<char>>>(),
             letter_index,
         })
@@ -107,24 +109,40 @@ impl CrosswordPuzzleSolver {
         }
     }
 
-    fn get_letter(&self, position: CrosswordPosition) -> char {
-        self.crossword.get(position.y).unwrap().get(position.x).unwrap().clone()
+    fn get_letter(&self, position: CrosswordPosition) -> Option<&char> {
+        if position.x < 0 || position.y < 0 {
+            return None;
+        }
+        if let Some(row) = self.crossword.get(position.y as usize) {
+            row.get(position.x as usize)
+        } else {
+            None
+        }
     }
 
-    pub fn search_word(&self, word: String) -> Result<Option<CrosswordWordData>, CrosswordError> {
+    pub fn find_word(&self, word: &String) -> Result<Option<CrosswordWordData>, CrosswordError> {
+        //dbg!("looking for {}", &word);
         let first_char = word.chars().next().unwrap();
         if let Some(positions) = self.letter_index.get(&first_char) {
             'position_loop: for position in positions {
-                'word_loop: for (index, letter) in word.chars().enumerate() {
-                    if self.get_letter(position.get_position_from_direction(WordDirection::Right, index)) != letter {
-                        continue 'position_loop;
+                //dbg!("trying position {:?}", position);
+                'direction_loop: for direction in WordDirection::iter() {
+                    //dbg!("trying direction {:?}", &direction);
+                    'word_loop: for (index, expected_letter) in word.chars().enumerate() {
+                        let crossword_letter = self.get_letter(position.get_position_from_direction(&direction, index));
+                        if crossword_letter.is_none() || *crossword_letter.unwrap() != expected_letter {
+                            //dbg!("{:?} (at position {:?}) does not match expected {:?}", crossword_letter, position.get_position_from_direction(&direction, index), expected_letter);
+                            continue 'direction_loop;
+                        }
+                        //dbg!("{} matched", crossword_letter.unwrap());
                     }
+                    ////dbg!("word found!");
+                    return Ok(Some(CrosswordWordData {
+                        position: *position,
+                        direction: direction
+                    }))
                 }
 
-                return Ok(Some(CrosswordWordData {
-                    position: position.clone(),
-                    direction: WordDirection::Right
-                }))
             }
         }
 
@@ -133,6 +151,24 @@ impl CrosswordPuzzleSolver {
 }
 
 fn main() {
+    let crossword = "EGVXGIPLKEDGKSSAFGYGLVGFEKNCLEARXCYGNKTRCIUEYDAWRDIYABAIRREENEOZTTUEPLSOTHROMVOXTSTTWEDSRIFPDOAOISWFVAEEELKUFTVIMITOBVVHOXNTAEEITGLSOOTVIETQYDTTDFSLDNEDEEHDNTEONITAIYDEBICDEROMANESDTHYUJUNPVTOHHTOQANCDOWAOMXMWRVHXRUERLTEIHOUAEFFRMTODEOGXOFEYTNEDRACDCTHNBH".to_string();
+    let solver = CrosswordPuzzleSolver::new(crossword, CrosswordDimensions { width: 15, height: 17});
+    let solver = solver.unwrap();
+    dbg!(&solver);
+
+    for row in &solver.crossword {
+        for letter in row {
+            print!("{} ", letter);
+        }
+        print!("\n");
+    }
+
+    let words = vec!["ADORING", "ARDENT", "BESOTTED", "CAPTIVATED", "DEVOTED", "DOTING", "ENAMORED", "FOND", "HEADOVERHEELS", "HEARTSINTHEIREYES", "INFATUATED", "LOVESICK", "LOVESTRUCK", "LOVEYDOVEY", "SMITTEN", "TWITTERPATED"].iter().map(|x| x.to_string()).collect::<Vec<String>>();
+    for word in words {
+        if let Ok(Some(result)) = solver.find_word(&word) {
+            println!("Found {} at {:?} going {:?}!", word, result.position, result.direction);
+        }
+    }
 }
 
 #[test]
@@ -141,30 +177,6 @@ fn create_crossword_solver() {
     let solver = CrosswordPuzzleSolver::new(crossword, CrosswordDimensions { width: 12, height: 12 });
     
     assert!(solver.is_ok());
-}
-
-#[test]
-fn search_for_a_word() {
-    let crossword = String::from("WVFXZYZWGXDEPARAGUAYLSVMEREOIUJUBJEAWGNIDBYSGYNNUECPYAMALUBIINHPERUONORRNTGDBCOCLASUAIUWTKHIEOUSDNIEOIVPXYCQLAABLIZARBFUYINEACFAKUCKXGALEUZENEVZ");
-    let solver = CrosswordPuzzleSolver::new(crossword, CrosswordDimensions { width: 12, height: 12 });
-    assert!(solver.is_ok());
-    let solver = solver.unwrap();
-    assert!(solver.search_word(String::from("PARAGUAY")).is_ok());
-    assert!(solver.search_word(String::from("PARAGUAY")).unwrap().is_some());
-    assert_eq!(
-        solver.search_word(String::from("PARAGUAY")).unwrap().unwrap(),
-        CrosswordWordData { direction: WordDirection::Right, position: CrosswordPosition { x: 0, y: 1 }}
-    );
-
-    assert!(solver.search_word(String::from("PERU")).is_ok());
-    assert!(solver.search_word(String::from("PERU")).unwrap().is_some());
-    dbg!(solver.search_word(String::from("PERU")).unwrap().unwrap());
-    assert_eq!(
-        solver.search_word(String::from("PERU")).unwrap().unwrap(),
-        CrosswordWordData { direction: WordDirection::Right, position: CrosswordPosition { x: 3, y: 5 }}
-    );
-
-    assert!(solver.search_word(String::from("asdf!")).is_ok());
 }
 
 #[test]
@@ -177,4 +189,28 @@ fn square_puzzle_equals_normal_puzzle() {
     assert!(solver_square.is_ok());
 
     assert_eq!(solver_normal.unwrap(), solver_square.unwrap());
+}
+
+#[test]
+fn search_for_a_word() {
+    let crossword = String::from("WVFXZYZWGXDEPARAGUAYLSVMEREOIUJUBJEAWGNIDBYSGYNNUECPYAMALUBIINHPERUONORRNTGDBCOCLASUAIUWTKHIEOUSDNIEOIVPXYCQLAABLIZARBFUYINEACFAKUCKXGALEUZENEVZ");
+    let solver = CrosswordPuzzleSolver::new(crossword, CrosswordDimensions { width: 12, height: 12 });
+    assert!(solver.is_ok());
+    let solver = solver.unwrap();
+    assert!(solver.find_word(String::from("PARAGUAY")).is_ok());
+    assert!(solver.find_word(String::from("PARAGUAY")).unwrap().is_some());
+    assert_eq!(
+        solver.find_word(String::from("PARAGUAY")).unwrap().unwrap(),
+        CrosswordWordData { direction: WordDirection::Right, position: CrosswordPosition { x: 0, y: 1 }}
+    );
+
+    assert!(solver.find_word(String::from("PERU")).is_ok());
+    assert!(solver.find_word(String::from("PERU")).unwrap().is_some());
+    //dbg!(solver.find_word(String::from("PERU")).unwrap().unwrap());
+    assert_eq!(
+        solver.find_word(String::from("PERU")).unwrap().unwrap(),
+        CrosswordWordData { direction: WordDirection::Right, position: CrosswordPosition { x: 3, y: 5 }}
+    );
+
+    assert!(solver.find_word(String::from("asdf!")).is_ok());
 }
