@@ -3,8 +3,6 @@
 use std::{collections::HashMap, ops::Add};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
-use log::debug;
-
 
 #[derive(Debug, Clone)]
 enum CrosswordError {
@@ -79,7 +77,7 @@ impl CrosswordPuzzleSolver {
             //dbg!(position);
             //dbg!(char);
 
-            if let Some(positions) = letter_index.get_mut(&char) {
+            if let Some(positions) = letter_index.get_mut(char) {
                 positions.push(position);
             } else {
                 letter_index.insert(*char, vec![position]);
@@ -120,15 +118,15 @@ impl CrosswordPuzzleSolver {
         }
     }
 
-    pub fn find_word(&self, word: &String) -> Result<Option<CrosswordWordData>, CrosswordError> {
+    pub fn find_word(&self, word: &str) -> Result<Option<CrosswordWordData>, CrosswordError> {
         //dbg!("looking for {}", &word);
         let first_char = word.chars().next().unwrap();
         if let Some(positions) = self.letter_index.get(&first_char) {
-            'position_loop: for position in positions {
+            '_position_loop: for position in positions {
                 //dbg!("trying position {:?}", position);
                 'direction_loop: for direction in WordDirection::iter() {
                     //dbg!("trying direction {:?}", &direction);
-                    'word_loop: for (index, expected_letter) in word.chars().enumerate() {
+                    '_word_loop: for (index, expected_letter) in word.chars().enumerate() {
                         let crossword_letter = self.get_letter(position.get_position_from_direction(&direction, index));
                         if crossword_letter.is_none() || *crossword_letter.unwrap() != expected_letter {
                             //dbg!("{:?} (at position {:?}) does not match expected {:?}", crossword_letter, position.get_position_from_direction(&direction, index), expected_letter);
@@ -139,7 +137,7 @@ impl CrosswordPuzzleSolver {
                     ////dbg!("word found!");
                     return Ok(Some(CrosswordWordData {
                         position: *position,
-                        direction: direction
+                        direction
                     }))
                 }
 
@@ -160,7 +158,7 @@ fn main() {
         for letter in row {
             print!("{} ", letter);
         }
-        print!("\n");
+        println!();
     }
 
     let words = vec!["ADORING", "ARDENT", "BESOTTED", "CAPTIVATED", "DEVOTED", "DOTING", "ENAMORED", "FOND", "HEADOVERHEELS", "HEARTSINTHEIREYES", "INFATUATED", "LOVESICK", "LOVESTRUCK", "LOVEYDOVEY", "SMITTEN", "TWITTERPATED"].iter().map(|x| x.to_string()).collect::<Vec<String>>();
