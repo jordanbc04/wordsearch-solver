@@ -148,27 +148,6 @@ impl CrosswordPuzzleSolver {
     }
 }
 
-fn main() {
-    let crossword = "EGVXGIPLKEDGKSSAFGYGLVGFEKNCLEARXCYGNKTRCIUEYDAWRDIYABAIRREENEOZTTUEPLSOTHROMVOXTSTTWEDSRIFPDOAOISWFVAEEELKUFTVIMITOBVVHOXNTAEEITGLSOOTVIETQYDTTDFSLDNEDEEHDNTEONITAIYDEBICDEROMANESDTHYUJUNPVTOHHTOQANCDOWAOMXMWRVHXRUERLTEIHOUAEFFRMTODEOGXOFEYTNEDRACDCTHNBH".to_string();
-    let solver = CrosswordPuzzleSolver::new(crossword, CrosswordDimensions { width: 15, height: 17});
-    let solver = solver.unwrap();
-    dbg!(&solver);
-
-    for row in &solver.crossword {
-        for letter in row {
-            print!("{} ", letter);
-        }
-        println!();
-    }
-
-    let words = vec!["ADORING", "ARDENT", "BESOTTED", "CAPTIVATED", "DEVOTED", "DOTING", "ENAMORED", "FOND", "HEADOVERHEELS", "HEARTSINTHEIREYES", "INFATUATED", "LOVESICK", "LOVESTRUCK", "LOVEYDOVEY", "SMITTEN", "TWITTERPATED"].iter().map(|x| x.to_string()).collect::<Vec<String>>();
-    for word in words {
-        if let Ok(Some(result)) = solver.find_word(&word) {
-            println!("Found {} at {:?} going {:?}!", word, result.position, result.direction);
-        }
-    }
-}
-
 #[test]
 fn create_crossword_solver() {
     let crossword = String::from("WVFXZYZWGXDEPARAGUAYLSVMEREOIUJUBJEAWGNIDBYSGYNNUECPYAMALUBIINHPERUONORRNTGDBCOCLASUAIUWTKHIEOUSDNIEOIVPXYCQLAABLIZARBFUYINEACFAKUCKXGALEUZENEVZ");
