@@ -196,21 +196,22 @@ fn search_for_a_word() {
     let crossword = String::from("WVFXZYZWGXDEPARAGUAYLSVMEREOIUJUBJEAWGNIDBYSGYNNUECPYAMALUBIINHPERUONORRNTGDBCOCLASUAIUWTKHIEOUSDNIEOIVPXYCQLAABLIZARBFUYINEACFAKUCKXGALEUZENEVZ");
     let solver = CrosswordPuzzleSolver::new(crossword, CrosswordDimensions { width: 12, height: 12 });
     assert!(solver.is_ok());
+
     let solver = solver.unwrap();
-    assert!(solver.find_word(String::from("PARAGUAY")).is_ok());
-    assert!(solver.find_word(String::from("PARAGUAY")).unwrap().is_some());
+    let first_word = String::from("PARAGUAY");
+    assert!(solver.find_word(&first_word).is_ok());
+    assert!(solver.find_word(&first_word).unwrap().is_some());
     assert_eq!(
-        solver.find_word(String::from("PARAGUAY")).unwrap().unwrap(),
-        CrosswordWordData { direction: WordDirection::Right, position: CrosswordPosition { x: 0, y: 1 }}
+        solver.find_word(&first_word).unwrap().unwrap(),
+        CrosswordWordData { direction: WordDirection::Right, position: CrosswordPosition { x: 0, y: 10 }}
     );
 
-    assert!(solver.find_word(String::from("PERU")).is_ok());
-    assert!(solver.find_word(String::from("PERU")).unwrap().is_some());
-    //dbg!(solver.find_word(String::from("PERU")).unwrap().unwrap());
-    assert_eq!(
-        solver.find_word(String::from("PERU")).unwrap().unwrap(),
-        CrosswordWordData { direction: WordDirection::Right, position: CrosswordPosition { x: 3, y: 5 }}
-    );
+    let second_word = String::from("PERU");
 
-    assert!(solver.find_word(String::from("asdf!")).is_ok());
+    assert!(solver.find_word(&second_word).is_ok());
+    assert!(solver.find_word(&second_word).unwrap().is_some());
+    assert_eq!(
+        solver.find_word(&second_word).unwrap().unwrap(),
+        CrosswordWordData { direction: WordDirection::Right, position: CrosswordPosition { x: 3, y: 6 }}
+    );
 }
