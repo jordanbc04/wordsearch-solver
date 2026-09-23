@@ -5,11 +5,11 @@ use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 #[derive(Debug, Clone)]
-enum CrosswordError {
+pub enum CrosswordError {
     InvalidInput(&'static str)
 
 }
-struct CrosswordDimensions { pub width: usize, pub height: usize }
+pub struct CrosswordDimensions { pub width: usize, pub height: usize }
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 struct CrosswordPosition { pub x: isize, pub y: isize }
 impl CrosswordPosition {
@@ -50,19 +50,20 @@ enum WordDirection {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-struct CrosswordWordData {
+pub struct CrosswordWordData {
     position: CrosswordPosition,
     direction: WordDirection
 }
 
 #[derive(Debug, PartialEq, Eq)]
-struct CrosswordPuzzleSolver {
+pub struct CrosswordPuzzleSolver {
     pub crossword: Vec<Vec<char>>,
-    letter_index: HashMap<char, Vec<CrosswordPosition>>
+    letter_index: HashMap<char, Vec<CrosswordPosition>>,
+    cached_answers: HashMap<String, CrosswordWordData>
 }
 
 impl CrosswordPuzzleSolver {
-    fn new(crossword: String, dimensions: CrosswordDimensions) -> Result<Self, CrosswordError> {
+    pub fn new(crossword: String, dimensions: CrosswordDimensions) -> Result<Self, CrosswordError> {
         if crossword.len() != (dimensions.height * dimensions.width) {
             return Err(CrosswordError::InvalidInput("crossword actual data length does not match dimensions implied length"));
         }
@@ -96,7 +97,7 @@ impl CrosswordPuzzleSolver {
         })
     }
 
-    fn square_puzzle(crossword: String) -> Result<Self, CrosswordError> {
+    pub fn square_puzzle(crossword: String) -> Result<Self, CrosswordError> {
         let crossword_length_float = f64::from(crossword.len() as u32);
         let crossword_side_length = crossword_length_float.sqrt();
 
@@ -143,7 +144,6 @@ impl CrosswordPuzzleSolver {
 
             }
         }
-
         Ok(None)
     }
 }
