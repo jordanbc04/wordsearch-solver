@@ -37,7 +37,7 @@ impl Add for CrosswordPosition {
         }
     }
 }
-#[derive(Debug, PartialEq, Eq, EnumIter)]
+#[derive(Debug, PartialEq, Eq, EnumIter, Copy, Clone)]
 enum WordDirection {
     Up,
     UpRight,
@@ -49,17 +49,32 @@ enum WordDirection {
     UpLeft,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+impl WordDirection {
+    pub fn get_relative_x_y(self) -> (i8, i8) {
+
+        match self {
+            WordDirection::Up => (0, 1),
+            WordDirection::UpRight => (1, 1),
+            WordDirection::Right => (1, 0),
+            WordDirection::DownRight => (1, -1),
+            WordDirection::Down => (0, -1),
+            WordDirection::DownLeft => (-1, -1),
+            WordDirection::Left => (-1, 0),
+            WordDirection::UpLeft => (-1, 1),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub struct CrosswordWordData {
     position: CrosswordPosition,
     direction: WordDirection
 }
-
 #[derive(Debug, PartialEq, Eq)]
 pub struct CrosswordPuzzleSolver {
     pub crossword: Vec<Vec<char>>,
     letter_index: HashMap<char, Vec<CrosswordPosition>>,
-    cached_answers: HashMap<String, CrosswordWordData>
+    cached_answers: HashMap<String, Option<CrosswordWordData>>
 }
 
 impl CrosswordPuzzleSolver {
@@ -70,13 +85,16 @@ impl CrosswordPuzzleSolver {
         
         let mut letter_index: HashMap<char, Vec<CrosswordPosition>> = HashMap::new();
 
-        for (x, char) in crossword.chars().collect::<Vec<char>>().chunks(dimensions.width).rev().flatten().enumerate() {
+        for (x, char) in crossword.chars().collect::<Vec<char>>().chunks(dimensions.width).flatten().enumerate() {
             let position = CrosswordPosition {
                 x: x as isize % dimensions.width as isize,
                 y: x as isize / dimensions.width as isize
             };
-            //dbg!(position);
-            //dbg!(char);
+
+            if (position.x == 0 || position.x == 1) && position.y == 0 {
+                dbg!(position);
+                dbg!(char);
+            }
 
             if let Some(positions) = letter_index.get_mut(char) {
                 positions.push(position);
@@ -91,9 +109,9 @@ impl CrosswordPuzzleSolver {
                 .collect::<Vec<char>>()
                 .chunks(dimensions.width)
                 .map(|x| x.to_vec())
-                .rev()
                 .collect::<Vec<Vec<char>>>(),
             letter_index,
+            cached_answers: HashMap::new()
         })
     }
 
@@ -119,32 +137,121 @@ impl CrosswordPuzzleSolver {
         }
     }
 
-    pub fn find_word(&self, word: &str) -> Result<Option<CrosswordWordData>, CrosswordError> {
-        //dbg!("looking for {}", &word);
+    pub fn find_word(&mut self, word: &str) -> Result<Option<CrosswordWordData>, CrosswordError> {
+        if let Some(answer) = self.cached_answers.get(word) {
+            return Ok(*answer)
+        }
+        println!("looking for {}", &word);
         let first_char = word.chars().next().unwrap();
         if let Some(positions) = self.letter_index.get(&first_char) {
             '_position_loop: for position in positions {
-                //dbg!("trying position {:?}", position);
+                println!("trying position {:?}", position);
                 'direction_loop: for direction in WordDirection::iter() {
-                    //dbg!("trying direction {:?}", &direction);
+                    println!("trying direction {:?}", &direction);
                     '_word_loop: for (index, expected_letter) in word.chars().enumerate() {
                         let crossword_letter = self.get_letter(position.get_position_from_direction(&direction, index));
                         if crossword_letter.is_none() || *crossword_letter.unwrap() != expected_letter {
-                            //dbg!("{:?} (at position {:?}) does not match expected {:?}", crossword_letter, position.get_position_from_direction(&direction, index), expected_letter);
+                            println!("{:?} (at position {:?}) does not match expected {:?}", crossword_letter, position.get_position_from_direction(&direction, index), expected_letter);
                             continue 'direction_loop;
                         }
-                        //dbg!("{} matched", crossword_letter.unwrap());
+                        println!("{} matched", crossword_letter.unwrap());
                     }
-                    ////dbg!("word found!");
-                    return Ok(Some(CrosswordWordData {
+                    //dbg!("word found!");
+                    let result = Some(CrosswordWordData {
                         position: *position,
                         direction
-                    }))
+                    });
+                    dbg!(&result);
+                    self.cached_answers.insert(word.to_owned(), result);
+                    return Ok(result);
                 }
 
             }
         }
+        self.cached_answers.insert(word.to_owned(), None);
         Ok(None)
+    }
+
+    fn calculate_colored_coordinates(&self) -> HashMap<(isize, isize), i32>{
+        let mut colored_positions = HashMap::new();
+        for (word, result) in &self.cached_answers {
+            if result.is_none() {
+                continue;
+            }
+            let result = result.unwrap();
+
+            let origin_x = result.position.x;
+            let origin_y = result.position.y;
+
+            let (x_direction_multiplier, y_direction_multiplier) = result.direction.get_relative_x_y();
+            let direction_key = match result.direction {
+                WordDirection::Up => 1,
+                WordDirection::UpRight => 2,
+                WordDirection::Right => 3,
+                WordDirection::DownRight => 4,
+                WordDirection::Down => 5,
+                WordDirection::DownLeft => 6,
+                WordDirection::Left => 7,
+                WordDirection::UpLeft => 8,
+            };
+
+            for n in 0..word.len() as isize {
+                colored_positions.insert((origin_x + (x_direction_multiplier as isize * n), origin_y + (y_direction_multiplier as isize * n)), direction_key);
+            }
+        }
+
+        colored_positions
+    }
+
+    pub fn pretty_print(&mut self, words: Option<Vec<&str>>) -> String {
+        if let Some(words) = words {
+            for word in words {
+                _ = self.find_word(word);
+            }
+        }
+        let RED = "\x1B[38:5:196m";
+        let ORANGE = "\x1B[38:5:202m";
+        let YELLOW= "\x1B[38:5:226m";
+        let GREEN= "\x1B[38:5:76m";
+        let BLUE= "\x1B[38:5:39m";
+        let PURPLE= "\x1B[38:5:63m";
+        let PINK = "\x1B[38:5:201m";
+        let WHITE = "\x1B[38:5:231m";
+
+        let RESET = "\x1B[38:5:244m";
+        let mut output = String::new();
+        let colored_coords = self.calculate_colored_coordinates();
+
+        println!("{} ↖{} ↑{} ↗{}", WHITE, RED, ORANGE, RESET);
+        println!("{} ←  {} →{}", PINK, YELLOW, RESET);
+        println!("{} ↙{} ↓{} ↘{}", PURPLE, BLUE, GREEN, RESET);
+
+        for (y, row) in self.crossword.iter().enumerate().rev() {
+            output += "\t";
+            for (x, char) in row.iter().enumerate() {
+                if colored_coords.contains_key(&(x as isize, y as isize)) {
+                    output += match colored_coords[&(x as isize, y as isize)] {
+                        1 => RED,
+                        2 => ORANGE,
+                        3 => YELLOW,
+                        4 => GREEN,
+                        5 => BLUE,
+                        6 => PURPLE,
+                        7 => PINK,
+                        8 => WHITE,
+                        _ => panic!("FUCK!!!!!!!!!!!!!!")
+                    };
+                }
+                output.push(*char);
+                if colored_coords.contains_key(&(x as isize, y as isize)) {
+                    output += RESET;
+                }
+                output += " ";
+            }
+            output += "\n";
+        }
+
+        output
     }
 }
 
@@ -174,7 +281,7 @@ fn search_for_a_word() {
     let solver = CrosswordPuzzleSolver::new(crossword, CrosswordDimensions { width: 12, height: 12 });
     assert!(solver.is_ok());
 
-    let solver = solver.unwrap();
+    let mut solver = solver.unwrap();
     let first_word = String::from("PARAGUAY");
     assert!(solver.find_word(&first_word).is_ok());
     assert!(solver.find_word(&first_word).unwrap().is_some());
